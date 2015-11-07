@@ -1,0 +1,15 @@
+{
+  "name": "nytro-cache",
+  "version": "0.1.0",
+  "description": "Nytro Cache - Backend Cache e Load Balancer baseado em configurações simples e amigáveis com RESTFull",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "NODE_END=test mocha -t 10000"
+  },
+  "author": "Thiago B. da Silva <thiago@agenciadeinternet.com>",
+  "dependencies": {
+    "http-proxy": "^1.12.0",
+    "redis": "^2.3.0"
+  }
+}
