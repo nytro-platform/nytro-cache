@@ -5,7 +5,22 @@ var zlib = require('zlib');
 var redis = require('redis');
 var redisClient = redis.createClient();
 
-var target = 'http://local.menuespecial.com.br:8081';
+var config = {
+    target : 'http://local.menuespecial.com.br:8081',
+    ttl: 3600,
+    ignore: [
+        '/pcomm/info',
+        '/index.php/admin',
+        '/admin',
+        '/adminhtml',
+        '/checkout',
+        '/sales/order',
+        '/customer',
+        '/contacts',
+        '/PRESENTES',
+        '/boleto'
+    ]
+};
 
 var NYTRO_CACHE_VERSION = '0.1.0';
 var proxy = httpProxy.createProxyServer();
@@ -22,6 +37,16 @@ proxy.on('proxyRes', function (proxyRes, req, res) {
             canCache = true;
         }
     });
+
+    // Verifica a url requisitada pode ser enviada ao cache
+    if(canCache && config.ignore && config.ignore.length){
+        config.ignore.forEach(function(uri){
+            if(req.url.match(uri)){
+                console.log('Ignoring cache for URI ' + req.url);
+                canCache = false;
+            }
+        });
+    }
 
     if(canCache){
 
@@ -69,6 +94,9 @@ function cacheResponse(url, proxyRes, body){
 
     var cacheKey = cacheObj.url;
     redisClient.hmset(cacheKey, cacheObj);
+    if(config && config.ttl){
+        redisClient.expire(cacheKey, parseInt(config.ttl));
+    }
 }
 
 var upcaseFirstLetter = function (word) {
@@ -104,12 +132,12 @@ http.createServer(function(req, res){
                 if(err) console.log('RedisClient Error:' + err);
 
                 // Se não, envia diretamente
-                proxy.web(req, res, { target: target });
+                proxy.web(req, res, { target: config.target });
             }
         });
     } else {
         // Enviar para o proxy diretamente
-        proxy.web(req, res, { target: target });
+        proxy.web(req, res, { target: config.target });
     }
 
 }).listen(8080, function(){
