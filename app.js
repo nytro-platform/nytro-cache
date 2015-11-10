@@ -1,36 +1,23 @@
 var http = require('http');
-var httpProxy = require('http-proxy');
 var zlib = require('zlib');
 
+var httpProxy = require('http-proxy');
 var redis = require('redis');
+
 var redisClient = redis.createClient();
 
-var config = {
-    target : 'http://local.menuespecial.com.br:8081',
-    ttl: 3600,
-    ignore: [
-        '/pcomm/info',
-        '/index.php/admin',
-        '/admin',
-        '/adminhtml',
-        '/checkout',
-        '/sales/order',
-        '/customer',
-        '/contacts',
-        '/PRESENTES',
-        '/boleto'
-    ]
-};
+var config = require('./config');
 
 var NYTRO_CACHE_VERSION = '0.1.0';
 var proxy = httpProxy.createProxyServer();
 var contentTypesEnabled = ['text/html', 'text/css', 'application/x-javascript'];
 
 proxy.on('proxyRes', function (proxyRes, req, res) {
-    // Se não é 200, retorna
-    if (proxyRes.statusCode !== 200) return
 
-    // Se o content-type for texto, colocamos em cache
+    // Se não é 200, retorna
+    if (proxyRes.statusCode !== 200) return;
+
+    // Se o content-type for do tipo texto (não-binário), colocamos em cache
     var canCache = false;
     contentTypesEnabled.forEach(function(item){
         if(proxyRes.headers['content-type'].match(item)){
@@ -38,12 +25,21 @@ proxy.on('proxyRes', function (proxyRes, req, res) {
         }
     });
 
-    // Verifica a url requisitada pode ser enviada ao cache
-    if(canCache && config.ignore && config.ignore.length){
-        config.ignore.forEach(function(uri){
+    // Verifica a url requisitada está na lista de rotas desabilitadas para o cache
+    if(canCache && config.routes && config.routes.disable && config.routes.disable.length){
+        config.routes.disable.forEach(function(uri){
             if(req.url.match(uri)){
                 console.log('Ignoring cache for URI ' + req.url);
                 canCache = false;
+            }
+        });
+    }
+
+    // Verifica a url requisitada está na lista de rotas habilitadas para o cache
+    if(canCache && config.routes && config.routes.enable && config.routes.enable.length){
+        config.routes.enable.forEach(function(uri){
+            if(req.url.match(uri)){
+                canCache = true;
             }
         });
     }
@@ -99,16 +95,14 @@ function cacheResponse(url, proxyRes, body){
     }
 }
 
-var upcaseFirstLetter = function (word) {
-  return word[0].toUpperCase() + word.slice(1)
-}
-
 var camelCaseHeader = function (header) {
-  return header.split('-').map(upcaseFirstLetter).join('-')
-}
+    return header.split('-').map(function (word) {
+        return word[0].toUpperCase() + word.slice(1);
+    }).join('-');
+};
 
 // Cria o server para receber as requisições
-http.createServer(function(req, res){
+var server = http.createServer(function(req, res){
 
     // Somente se for uma requisição GET
     if(req.method === 'GET'){
@@ -132,15 +126,17 @@ http.createServer(function(req, res){
                 if(err) console.log('RedisClient Error:' + err);
 
                 // Se não, envia diretamente
+                if(req.url.match(/\.html/)) console.log(req.url);
                 proxy.web(req, res, { target: config.target });
             }
         });
     } else {
         // Enviar para o proxy diretamente
+        console.log('Proxy request method ' + req.method + ' for ' + req.url);
         proxy.web(req, res, { target: config.target });
     }
 
-}).listen(8080, function(){
+}).listen(config.port ? config.port : 8080, function(){
     // Mensagem de init do server
-    console.log('Cache server listening on 8080');
+    console.log('Cache server listening on ' + server.address().port);
 });
