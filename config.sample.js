@@ -17,5 +17,9 @@ module.exports = {
             '/contacts',
             '/boleto'
         ]
+    },
+    redis: {
+        host: 'localhost',
+        port: 6370
     }
 };
