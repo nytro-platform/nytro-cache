@@ -1,6 +1,6 @@
 module.exports = {
-    port: 4000,
-    target: 'http://local.usenatureza.com:4001',
+    port: 8080,
+    target: 'http://local.website.com/',
     ttl: 3600,
     routes: {
         enable: [
